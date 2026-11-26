@@ -10,6 +10,20 @@ backend/backend/     Spring Boot 4.2 / Java 25 REST API
 docker-compose.yml   PostgreSQL (+ optional full stack)
 ```
 
+## Screenshots
+
+| Dashboard | My CVs |
+|---|---|
+| ![Dashboard](images/dashboard.png) | ![My CVs](images/cvs.png) |
+
+| Target job | AI CV agent |
+|---|---|
+| ![Target job](images/jobs.png) | ![AI CV agent](images/agent.png) |
+
+| History |
+|---|
+| ![History](images/history.png) |
+
 ## Quick start (local development)
 
 Prerequisites: Java 25, Maven 3.9+, Node 22+, Docker (for PostgreSQL).
