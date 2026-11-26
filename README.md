@@ -12,17 +12,15 @@ docker-compose.yml   PostgreSQL (+ optional full stack)
 
 ## Screenshots
 
-| Dashboard | My CVs |
-|---|---|
-| ![Dashboard](images/dashboard.png) | ![My CVs](images/cvs.png) |
+<img src="images/dashboard.png" alt="Dashboard" width="100%">
 
-| Target job | AI CV agent |
-|---|---|
-| ![Target job](images/jobs.png) | ![AI CV agent](images/agent.png) |
+<img src="images/cvs.png" alt="My CVs" width="100%">
 
-| History |
-|---|
-| ![History](images/history.png) |
+<img src="images/jobs.png" alt="Target job" width="100%">
+
+<img src="images/agent.png" alt="AI CV agent" width="100%">
+
+<img src="images/history.png" alt="History" width="100%">
 
 ## Quick start (local development)
 
