@@ -1,0 +1,32 @@
+.input-area {
+  margin-top: 16px;
+}
+
+.file-selected {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--primary-line);
+  border-radius: var(--radius-sm);
+  background: var(--primary-soft);
+}
+
+.file-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--primary);
+}
+
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.field .row {
+  gap: 8px;
+}

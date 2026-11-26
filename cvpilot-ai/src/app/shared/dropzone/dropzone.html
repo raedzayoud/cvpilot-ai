@@ -1,0 +1,26 @@
+<label
+  class="dropzone"
+  [class.compact]="compact()"
+  [class.dragging]="dragging()"
+  (dragover)="$event.preventDefault(); dragging.set(true)"
+  (dragleave)="dragging.set(false)"
+  (drop)="onDrop($event)"
+>
+  <input class="file-input" type="file" [accept]="accept()" (change)="onChange($event)" />
+  <span class="icon" aria-hidden="true">
+    <svg width="22" height="22" viewBox="0 0 22 22">
+      <path
+        d="M11 4v11M5.5 9.5 11 4l5.5 5.5"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.6"
+      />
+      <path d="M4 17.5h14" fill="none" stroke="currentColor" stroke-width="1.6" />
+    </svg>
+  </span>
+  <span class="title">{{ title() }}</span>
+  <span class="hint">{{ hint() }}</span>
+  @if (error()) {
+    <span class="error" role="alert">{{ error() }}</span>
+  }
+</label>

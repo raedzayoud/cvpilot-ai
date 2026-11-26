@@ -1,0 +1,71 @@
+<a class="skip-link" href="#main">Skip to content</a>
+
+<div class="shell">
+  <header class="topbar">
+    <a class="brand" routerLink="/" aria-label="CVPilot AI dashboard">
+      <span class="mark" aria-hidden="true">C</span>
+      <span class="wordmark">CVPilot <span class="ai">AI</span></span>
+    </a>
+    <button
+      type="button"
+      class="menu-btn"
+      [attr.aria-expanded]="menuOpen()"
+      aria-controls="sidebar"
+      [attr.aria-label]="menuOpen() ? 'Close navigation' : 'Open navigation'"
+      (click)="menuOpen.set(!menuOpen())"
+    >
+      <app-icon [name]="menuOpen() ? 'x' : 'menu'" [size]="20" />
+    </button>
+  </header>
+
+  @if (menuOpen()) {
+    <div class="scrim" (click)="menuOpen.set(false)" aria-hidden="true"></div>
+  }
+
+  <aside
+    id="sidebar"
+    class="rail"
+    [class.open]="menuOpen()"
+    (keydown.escape)="menuOpen.set(false)"
+  >
+    <a class="brand desktop-only" routerLink="/" aria-label="CVPilot AI dashboard">
+      <span class="mark" aria-hidden="true">C</span>
+      <span class="wordmark">CVPilot <span class="ai">AI</span></span>
+    </a>
+
+    <nav class="nav" aria-label="Main">
+      @for (item of nav; track item.path) {
+        <a
+          [routerLink]="item.path"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: item.exact }"
+          #rla="routerLinkActive"
+          [attr.aria-current]="rla.isActive ? 'page' : null"
+        >
+          <app-icon [name]="item.icon" />
+          <span>{{ item.label }}</span>
+        </a>
+      }
+    </nav>
+
+    <div class="rail-foot">
+      @if (status(); as s) {
+        <div class="status" [class]="'status ' + statusTone(s)" role="status">
+          <span class="dot" aria-hidden="true"></span>
+          <span>{{ statusLabel(s) }}</span>
+        </div>
+      }
+      <p class="rail-note">
+        <app-icon name="shield" [size]="16" />
+        <span>CVPilot only writes what your CV can back. It never invents skills you do not have.</span>
+      </p>
+    </div>
+  </aside>
+
+  <main id="main" class="main" tabindex="-1">
+    <router-outlet />
+  </main>
+</div>
+
+<app-toast-host />
+<app-confirm-dialog />

@@ -1,0 +1,108 @@
+@let p = profile();
+<article class="doc" aria-label="CV preview">
+  <header class="doc-head">
+    <h1>{{ p.personalInfo.fullName || 'Your name' }}</h1>
+    @if (p.professionalTitle) {
+      <p class="title">{{ p.professionalTitle }}</p>
+    }
+    @if (p.personalInfo.links.length > 0) {
+      <p class="line">
+        @for (link of p.personalInfo.links; track link; let last = $last) {
+          @if (href(link); as url) {
+            <a [href]="url" target="_blank" rel="noopener">{{ linkLabel(link) }}</a>
+          } @else {
+            <span>{{ link }}</span>
+          }
+          @if (!last) {
+            <span class="sep">—</span>
+          }
+        }
+      </p>
+    }
+    <p class="line">
+      @for (part of contact(p); track part; let last = $last) {
+        <span>{{ part }}</span>
+        @if (!last) {
+          <span class="sep">—</span>
+        }
+      }
+    </p>
+  </header>
+
+  @for (key of sections(); track key) {
+    <section class="doc-section">
+      <h2>{{ labels[key] }}</h2>
+      @switch (key) {
+        @case ('summary') {
+          <p>{{ p.summary }}</p>
+        }
+        @case ('skills') {
+          <p>{{ p.skills.join(', ') }}</p>
+        }
+        @case ('experience') {
+          @for (e of p.experiences; track e.id) {
+            <div class="entry">
+              <div class="entry-head">
+                <strong>{{ e.role }}@if (e.company) { — {{ e.company }} }</strong>
+                <span class="meta">{{ e.location }}<span class="gap"></span>{{ dates(e.start, e.end) }}</span>
+              </div>
+              <ul>
+                @for (b of e.bullets; track $index) {
+                  <li>{{ b }}</li>
+                }
+              </ul>
+              @if (e.technologies.length) {
+                <p class="tech">Technologies: {{ e.technologies.join(', ') }}</p>
+              }
+            </div>
+          }
+        }
+        @case ('projects') {
+          @for (pr of p.projects; track pr.id) {
+            <div class="entry">
+              <div class="entry-head"><strong>{{ pr.name }}</strong></div>
+              @if (pr.description) {
+                <p>{{ pr.description }}</p>
+              }
+              @if (pr.technologies.length) {
+                <p class="tech">Technologies: {{ pr.technologies.join(', ') }}</p>
+              }
+            </div>
+          }
+        }
+        @case ('education') {
+          @for (ed of p.education; track ed.id) {
+            <div class="entry">
+              <div class="entry-head">
+                <strong>{{ ed.school }}@if (ed.location) { — {{ ed.location }} }</strong>
+                <span class="meta">{{ dates(ed.start, ed.end) }}</span>
+              </div>
+              <p class="degree">{{ ed.degree }}@if (ed.details) { — {{ ed.details }} }</p>
+            </div>
+          }
+        }
+        @case ('certifications') {
+          <ul>
+            @for (c of p.certifications; track c.id) {
+              <li>{{ c.name }}@if (c.issuer) { — {{ c.issuer }} }@if (c.year) { ({{ c.year }}) }</li>
+            }
+          </ul>
+        }
+        @case ('languages') {
+          <p>
+            @for (l of p.languages; track l.id; let last = $last) {
+              {{ l.name }}@if (l.level) { ({{ l.level }}) }@if (!last) { — }
+            }
+          </p>
+        }
+        @case ('achievements') {
+          <ul>
+            @for (a of p.achievements; track $index) {
+              <li>{{ a }}</li>
+            }
+          </ul>
+        }
+      }
+    </section>
+  }
+</article>

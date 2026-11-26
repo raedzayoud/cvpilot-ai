@@ -1,0 +1,64 @@
+# CVPilot AI: PostgreSQL + Spring Boot API + Angular SSR frontend.
+#
+#   Database only (for local `mvn spring-boot:run` + `npm start`):
+#     docker compose up -d postgres
+#   Everything:
+#     docker compose --profile full up -d --build
+#
+# Secrets come from ./backend/backend/.env (GROQ_API_KEY, ...). See backend/backend/.env.example.
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-cvpilot}
+      POSTGRES_USER: ${DB_USERNAME:-cvpilot}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-cvpilot}
+    ports:
+      # 5433 on the host so it does not clash with a locally installed PostgreSQL on 5432.
+      - "${DB_HOST_PORT:-5433}:5432"
+    volumes:
+      - cvpilot-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    profiles: ["full"]
+    build: ./backend/backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - path: ./backend/backend/.env
+        required: false
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-cvpilot}
+      DB_USERNAME: ${DB_USERNAME:-cvpilot}
+      DB_PASSWORD: ${DB_PASSWORD:-cvpilot}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:4000}
+      SWAGGER_ENABLED: "true"
+    ports:
+      - "8080:8080"
+
+  frontend:
+    profiles: ["full"]
+    build:
+      context: ./cvpilot-ai
+      args:
+        API_BASE_URL: ${API_BASE_URL:-http://localhost:8080/api}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "4000:4000"
+
+volumes:
+  cvpilot-db:

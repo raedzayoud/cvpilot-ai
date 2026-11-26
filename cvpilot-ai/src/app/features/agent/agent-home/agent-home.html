@@ -1,0 +1,92 @@
+<div class="page">
+  <header class="page-head">
+    <div>
+      <p class="eyebrow"><app-icon name="bot" [size]="14" /> AI CV Agent</p>
+      <h1>Edit your CV by talking to it</h1>
+      <p class="sub">
+        Give instructions in plain language. The agent plans the edits, checks every claim against your CV, and
+        shows each change for your approval before anything is applied.
+      </p>
+    </div>
+  </header>
+
+  @if (loading()) {
+    <div class="stack" aria-busy="true" aria-label="Loading">
+      <div class="skeleton block-skeleton short"></div>
+      <div class="skeleton row-skeleton"></div>
+    </div>
+  } @else if (error()) {
+    <div class="alert error" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ error() }}</span>
+      <button type="button" class="btn btn-sm" (click)="load()">Retry</button>
+    </div>
+  } @else {
+    <section class="section start" aria-labelledby="start-title">
+      <div class="start-main">
+        <h2 id="start-title">Start a session</h2>
+        <p class="muted small">The agent works on a copy; your CV changes only when you choose “Save to CV”.</p>
+        @if (cvs().length === 0) {
+          <div class="alert info">
+            <app-icon name="info" [size]="16" />
+            <span>Upload a CV first.</span>
+            <a class="btn btn-sm" routerLink="/cvs">Go to My CVs</a>
+          </div>
+        } @else {
+          <form class="start-form" (ngSubmit)="start()">
+            <label class="sr-only" for="agent-cv">CV to edit</label>
+            <select id="agent-cv" name="cv" class="select" [ngModel]="cvId()" (ngModelChange)="cvId.set($event)">
+              @for (cv of cvs(); track cv.id) {
+                <option [value]="cv.id">{{ cv.fileName }} — {{ cv.language }}</option>
+              }
+            </select>
+            <button type="submit" class="btn btn-primary" [disabled]="starting() || !cvId()">
+              @if (starting()) {
+                <span class="spinner sm" aria-hidden="true"></span> Starting…
+              } @else {
+                <app-icon name="sparkles" [size]="16" /> Start editing
+              }
+            </button>
+          </form>
+        }
+      </div>
+      <ul class="caps">
+        @for (c of capabilities; track c.title) {
+          <li>
+            <span class="cap-icon"><app-icon [name]="c.icon" [size]="16" /></span>
+            <div>
+              <strong>{{ c.title }}</strong>
+              <p class="muted small">{{ c.text }}</p>
+            </div>
+          </li>
+        }
+      </ul>
+    </section>
+
+    <section class="recent" aria-labelledby="recent-title">
+      <h2 id="recent-title">Recent sessions</h2>
+      @if (sessions().length === 0) {
+        <div class="empty">
+          <span class="empty-icon"><app-icon name="chat" [size]="22" /></span>
+          <h2>No sessions yet</h2>
+          <p>Start one above; your conversations and proposed changes are kept here.</p>
+        </div>
+      } @else {
+        <div class="session-grid">
+          @for (s of sessions(); track s.id) {
+            <a class="session-card" [routerLink]="['/agent', s.id]">
+              <span class="s-icon"><app-icon name="bot" [size]="16" /></span>
+              <span class="s-body">
+                <span class="s-title">{{ s.title }}</span>
+                <span class="muted small">{{ s.cvFileName }} · {{ s.updatedAt | date: 'MMM d, HH:mm' }}</span>
+              </span>
+              @if (s.savedAt) {
+                <span class="badge success">Saved</span>
+              }
+            </a>
+          }
+        </div>
+      }
+    </section>
+  }
+</div>

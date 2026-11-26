@@ -1,0 +1,576 @@
+<div class="page">
+  @if (loading()) {
+    <div class="stack" aria-busy="true" aria-label="Loading CV">
+      <div class="skeleton title-skeleton"></div>
+      <div class="skeleton block-skeleton"></div>
+      <div class="skeleton block-skeleton"></div>
+    </div>
+  } @else if (error()) {
+    <div class="alert error" role="alert">
+      <span>{{ error() }}</span>
+      <button type="button" class="btn btn-ghost" (click)="load()">Retry</button>
+    </div>
+  } @else if (cv(); as c) {
+    <a class="back" routerLink="/cvs"><app-icon name="back" [size]="14" /> My CVs</a>
+
+    <header class="page-head">
+      <div>
+        <h1>{{ c.fileName }}</h1>
+        <p class="sub">
+          {{ c.sourceFormat.toUpperCase() }} source, extracted profile in {{ c.language }}. The
+          original file is never modified; exports use the LaTeX résumé template with your approved content.
+        </p>
+      </div>
+      <div class="head-actions">
+        <button type="button" class="btn" (click)="downloadOriginal()">
+          <app-icon name="download" [size]="16" /> Download original
+        </button>
+        <a class="btn" routerLink="/agent" [queryParams]="{ cv: c.id }">
+          <app-icon name="bot" [size]="16" /> Edit with AI Agent
+        </a>
+        <a class="btn btn-primary" routerLink="/jobs" [queryParams]="{ cv: c.id }">
+          <app-icon name="sparkles" [size]="16" /> Tailor to a job
+        </a>
+      </div>
+    </header>
+
+    @if (c.extractionNote) {
+      <div class="alert warning note" role="status">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ c.extractionNote }}</span>
+      </div>
+    }
+
+    <form (input)="touch()" (submit)="$event.preventDefault(); save()">
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <h2>Personal details</h2>
+            <p class="muted small">Preserved exactly during customization.</p>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label for="fullName">Full name</label>
+            <input
+              id="fullName"
+              name="fullName"
+              class="input"
+              [(ngModel)]="c.profile.personalInfo.fullName"
+            />
+          </div>
+          <div class="field">
+            <label for="email">Email</label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              class="input"
+              [class.invalid]="emailInvalid()"
+              [attr.aria-invalid]="emailInvalid()"
+              aria-describedby="email-error"
+              [(ngModel)]="c.profile.personalInfo.email"
+            />
+            @if (emailInvalid()) {
+              <span id="email-error" class="field-error">Enter a valid email address.</span>
+            }
+          </div>
+          <div class="field">
+            <label for="phone">Phone</label>
+            <input
+              id="phone"
+              name="phone"
+              class="input"
+              [(ngModel)]="c.profile.personalInfo.phone"
+            />
+          </div>
+          <div class="field">
+            <label for="location">Location</label>
+            <input
+              id="location"
+              name="location"
+              class="input"
+              [(ngModel)]="c.profile.personalInfo.location"
+            />
+          </div>
+          <div class="field span-2">
+            <label for="links">Links (comma separated)</label>
+            <input
+              id="links"
+              name="links"
+              class="input"
+              [ngModel]="c.profile.personalInfo.links.join(',')"
+              (ngModelChange)="setLinks($event)"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <h2>Summary</h2>
+            <p class="muted small">Rewritten per job, always from facts already in this profile.</p>
+          </div>
+        </div>
+        <div class="stack">
+          <div class="field">
+            <label for="title">Professional title</label>
+            <input
+              id="title"
+              name="title"
+              class="input"
+              [(ngModel)]="c.profile.professionalTitle"
+            />
+          </div>
+          <div class="field">
+            <label for="summary">Professional summary</label>
+            <textarea
+              id="summary"
+              name="summary"
+              class="textarea"
+              rows="4"
+              [(ngModel)]="c.profile.summary"
+            ></textarea>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <h2>Technical skills</h2>
+          <span class="muted small">{{ c.profile.skills.length }} listed</span>
+        </div>
+        <div class="chip-group">
+          @for (skill of c.profile.skills; track skill; let i = $index) {
+            <span class="chip">
+              {{ skill }}
+              <button
+                type="button"
+                class="chip-remove"
+                [attr.aria-label]="'Remove ' + skill"
+                (click)="removeSkill(i)"
+              >
+                ×
+              </button>
+            </span>
+          }
+        </div>
+        <div class="add-row">
+          <input
+            #skillInput
+            class="input"
+            placeholder="Add a skill"
+            aria-label="Add a skill"
+            (keydown.enter)="addSkill(skillInput); $event.preventDefault()"
+          />
+          <button type="button" class="btn" (click)="addSkill(skillInput)">Add</button>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <h2>Experience</h2>
+          <button type="button" class="btn btn-ghost" (click)="addExperience()">
+            Add experience
+          </button>
+        </div>
+
+        @for (exp of c.profile.experiences; track exp.id; let ei = $index) {
+          <div class="subcard">
+            <div class="subcard-head">
+              <span class="subcard-title">Experience {{ ei + 1 }}</span>
+              <button
+                type="button"
+                class="btn btn-ghost btn-danger"
+                (click)="removeExperience(exp.id)"
+              >
+                Remove
+              </button>
+            </div>
+            <div class="grid-2">
+              <div class="field">
+                <label [attr.for]="'exp' + ei + 'role'">Role</label>
+                <input
+                  [id]="'exp' + ei + 'role'"
+                  [name]="'exp' + ei + 'role'"
+                  class="input"
+                  [(ngModel)]="exp.role"
+                />
+              </div>
+              <div class="field">
+                <label [attr.for]="'exp' + ei + 'company'">Company</label>
+                <input
+                  [id]="'exp' + ei + 'company'"
+                  [name]="'exp' + ei + 'company'"
+                  class="input"
+                  [(ngModel)]="exp.company"
+                />
+              </div>
+              <div class="field">
+                <label [attr.for]="'exp' + ei + 'location'">Location</label>
+                <input
+                  [id]="'exp' + ei + 'location'"
+                  [name]="'exp' + ei + 'location'"
+                  class="input"
+                  [(ngModel)]="exp.location"
+                />
+              </div>
+              <div class="grid-2">
+                <div class="field">
+                  <label [attr.for]="'exp' + ei + 'start'">Start</label>
+                  <input
+                    [id]="'exp' + ei + 'start'"
+                    [name]="'exp' + ei + 'start'"
+                    class="input"
+                    [(ngModel)]="exp.start"
+                  />
+                </div>
+                <div class="field">
+                  <label [attr.for]="'exp' + ei + 'end'">End</label>
+                  <input
+                    [id]="'exp' + ei + 'end'"
+                    [name]="'exp' + ei + 'end'"
+                    class="input"
+                    [(ngModel)]="exp.end"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <p class="field-label bullets-label">Highlights</p>
+            <div class="stack-sm">
+              @for (bullet of exp.bullets; track $index; let bi = $index) {
+                <div class="bullet-row">
+                  <input
+                    [name]="'exp' + ei + 'bullet' + bi"
+                    class="input"
+                    [attr.aria-label]="'Highlight ' + (bi + 1) + ' for experience ' + (ei + 1)"
+                    [(ngModel)]="exp.bullets[bi]"
+                  />
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    [attr.aria-label]="'Remove highlight ' + (bi + 1)"
+                    (click)="removeBullet(exp, bi)"
+                  >
+                    ×
+                  </button>
+                </div>
+              }
+            </div>
+            <button type="button" class="btn btn-ghost add-bullet" (click)="addBullet(exp)">
+              Add highlight
+            </button>
+            <div class="field exp-tech">
+              <label [attr.for]="'exp' + ei + 'tech'">Technologies (comma separated)</label>
+              <input
+                [id]="'exp' + ei + 'tech'"
+                [name]="'exp' + ei + 'tech'"
+                class="input"
+                placeholder="Spring Boot, Angular, PostgreSQL"
+                [ngModel]="exp.technologies.join(',')"
+                (ngModelChange)="setExperienceTechnologies(exp.id, $event)"
+              />
+            </div>
+          </div>
+        }
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <h2>Education</h2>
+          <button type="button" class="btn btn-ghost" (click)="addEducation()">
+            Add education
+          </button>
+        </div>
+        @for (edu of c.profile.education; track edu.id; let ei = $index) {
+          <div class="subcard">
+            <div class="subcard-head">
+              <span class="subcard-title">Education {{ ei + 1 }}</span>
+              <button
+                type="button"
+                class="btn btn-ghost btn-danger"
+                (click)="removeEducation(edu.id)"
+              >
+                Remove
+              </button>
+            </div>
+            <div class="grid-2">
+              <div class="field">
+                <label [attr.for]="'edu' + ei + 'degree'">Degree</label>
+                <input
+                  [id]="'edu' + ei + 'degree'"
+                  [name]="'edu' + ei + 'degree'"
+                  class="input"
+                  [(ngModel)]="edu.degree"
+                />
+              </div>
+              <div class="field">
+                <label [attr.for]="'edu' + ei + 'school'">School</label>
+                <input
+                  [id]="'edu' + ei + 'school'"
+                  [name]="'edu' + ei + 'school'"
+                  class="input"
+                  [(ngModel)]="edu.school"
+                />
+              </div>
+              <div class="field">
+                <label [attr.for]="'edu' + ei + 'location'">Location</label>
+                <input
+                  [id]="'edu' + ei + 'location'"
+                  [name]="'edu' + ei + 'location'"
+                  class="input"
+                  [(ngModel)]="edu.location"
+                />
+              </div>
+              <div class="grid-2">
+                <div class="field">
+                  <label [attr.for]="'edu' + ei + 'start'">Start</label>
+                  <input
+                    [id]="'edu' + ei + 'start'"
+                    [name]="'edu' + ei + 'start'"
+                    class="input"
+                    [(ngModel)]="edu.start"
+                  />
+                </div>
+                <div class="field">
+                  <label [attr.for]="'edu' + ei + 'end'">End</label>
+                  <input
+                    [id]="'edu' + ei + 'end'"
+                    [name]="'edu' + ei + 'end'"
+                    class="input"
+                    [(ngModel)]="edu.end"
+                  />
+                </div>
+              </div>
+              <div class="field span-2">
+                <label [attr.for]="'edu' + ei + 'details'">Details</label>
+                <textarea
+                  [id]="'edu' + ei + 'details'"
+                  [name]="'edu' + ei + 'details'"
+                  class="textarea"
+                  rows="2"
+                  [(ngModel)]="edu.details"
+                ></textarea>
+              </div>
+            </div>
+          </div>
+        }
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <h2>Projects</h2>
+          <button type="button" class="btn btn-ghost" (click)="addProject()">Add project</button>
+        </div>
+        @for (project of c.profile.projects; track project.id; let pi = $index) {
+          <div class="subcard">
+            <div class="subcard-head">
+              <span class="subcard-title">Project {{ pi + 1 }}</span>
+              <button
+                type="button"
+                class="btn btn-ghost btn-danger"
+                (click)="removeProject(project.id)"
+              >
+                Remove
+              </button>
+            </div>
+            <div class="grid-2">
+              <div class="field">
+                <label [attr.for]="'prj' + pi + 'name'">Name</label>
+                <input
+                  [id]="'prj' + pi + 'name'"
+                  [name]="'prj' + pi + 'name'"
+                  class="input"
+                  [(ngModel)]="project.name"
+                />
+              </div>
+              <div class="field">
+                <label [attr.for]="'prj' + pi + 'link'">Link</label>
+                <input
+                  [id]="'prj' + pi + 'link'"
+                  [name]="'prj' + pi + 'link'"
+                  class="input"
+                  [(ngModel)]="project.link"
+                />
+              </div>
+              <div class="field span-2">
+                <label [attr.for]="'prj' + pi + 'description'">Description</label>
+                <textarea
+                  [id]="'prj' + pi + 'description'"
+                  [name]="'prj' + pi + 'description'"
+                  class="textarea"
+                  rows="2"
+                  [(ngModel)]="project.description"
+                ></textarea>
+              </div>
+              <div class="field span-2">
+                <label [attr.for]="'prj' + pi + 'tech'">Technologies (comma separated)</label>
+                <input
+                  [id]="'prj' + pi + 'tech'"
+                  [name]="'prj' + pi + 'tech'"
+                  class="input"
+                  [ngModel]="project.technologies.join(',')"
+                  (ngModelChange)="setTechnologies(project.id, $event)"
+                />
+              </div>
+            </div>
+          </div>
+        }
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <h2>Certifications and languages</h2>
+          <div class="row">
+            <button type="button" class="btn btn-ghost" (click)="addCertification()">
+              Add certification
+            </button>
+            <button type="button" class="btn btn-ghost" (click)="addLanguage()">
+              Add language
+            </button>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="stack-sm">
+            @for (cert of c.profile.certifications; track cert.id; let ci = $index) {
+              <div class="mini-card">
+                <div class="grid-3">
+                  <div class="field">
+                    <label [attr.for]="'cert' + ci + 'name'">Certification</label>
+                    <input
+                      [id]="'cert' + ci + 'name'"
+                      [name]="'cert' + ci + 'name'"
+                      class="input"
+                      [(ngModel)]="cert.name"
+                    />
+                  </div>
+                  <div class="field">
+                    <label [attr.for]="'cert' + ci + 'issuer'">Issuer</label>
+                    <input
+                      [id]="'cert' + ci + 'issuer'"
+                      [name]="'cert' + ci + 'issuer'"
+                      class="input"
+                      [(ngModel)]="cert.issuer"
+                    />
+                  </div>
+                  <div class="field">
+                    <label [attr.for]="'cert' + ci + 'year'">Year</label>
+                    <div class="bullet-row">
+                      <input
+                        [id]="'cert' + ci + 'year'"
+                        [name]="'cert' + ci + 'year'"
+                        class="input"
+                        [(ngModel)]="cert.year"
+                      />
+                      <button
+                        type="button"
+                        class="icon-btn"
+                        [attr.aria-label]="'Remove certification ' + cert.name"
+                        (click)="removeCertification(cert.id)"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+
+          <div class="stack-sm">
+            @for (lang of c.profile.languages; track lang.id; let li = $index) {
+              <div class="mini-card">
+                <div class="grid-2">
+                  <div class="field">
+                    <label [attr.for]="'lang' + li + 'name'">Language</label>
+                    <input
+                      [id]="'lang' + li + 'name'"
+                      [name]="'lang' + li + 'name'"
+                      class="input"
+                      [(ngModel)]="lang.name"
+                    />
+                  </div>
+                  <div class="field">
+                    <label [attr.for]="'lang' + li + 'level'">Level</label>
+                    <div class="bullet-row">
+                      <input
+                        [id]="'lang' + li + 'level'"
+                        [name]="'lang' + li + 'level'"
+                        class="input"
+                        [(ngModel)]="lang.level"
+                      />
+                      <button
+                        type="button"
+                        class="icon-btn"
+                        [attr.aria-label]="'Remove language ' + lang.name"
+                        (click)="removeLanguage(lang.id)"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <h2>Achievements</h2>
+            <p class="muted small">Awards, rankings and competitions, one per line.</p>
+          </div>
+          <button type="button" class="btn btn-ghost" (click)="addAchievement()">Add achievement</button>
+        </div>
+        @if (c.profile.achievements.length === 0) {
+          <p class="muted small">No achievements yet.</p>
+        }
+        <div class="stack-sm">
+          @for (achievement of c.profile.achievements; track $index; let ai = $index) {
+            <div class="bullet-row">
+              <input
+                [name]="'achievement' + ai"
+                class="input"
+                [attr.aria-label]="'Achievement ' + (ai + 1)"
+                [(ngModel)]="c.profile.achievements[ai]"
+              />
+              <button
+                type="button"
+                class="icon-btn"
+                [attr.aria-label]="'Remove achievement ' + (ai + 1)"
+                (click)="removeAchievement(ai)"
+              >
+                ×
+              </button>
+            </div>
+          }
+        </div>
+      </section>
+
+      <div class="save-bar">
+        <span class="muted small">
+          @if (dirty()) {
+            Unsaved changes
+          } @else {
+            All changes saved
+          }
+        </span>
+        <div class="row">
+          <a class="btn" routerLink="/cvs">My CVs</a>
+          <button type="submit" class="btn btn-primary" [disabled]="saving() || !dirty()">
+            @if (saving()) {
+              <span class="spinner sm" aria-hidden="true"></span> Saving…
+            } @else {
+              <app-icon name="check" [size]="16" /> Save profile
+            }
+          </button>
+        </div>
+      </div>
+    </form>
+  }
+</div>

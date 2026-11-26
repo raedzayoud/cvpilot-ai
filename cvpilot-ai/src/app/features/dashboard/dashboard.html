@@ -1,0 +1,181 @@
+<div class="page">
+  <header class="page-head">
+    <div>
+      <p class="eyebrow"><app-icon name="sparkles" [size]="14" /> Overview</p>
+      <h1>Dashboard</h1>
+      <p class="sub">From your original CV to a job-specific CV in minutes — every claim traced to your CV.</p>
+    </div>
+    <div class="head-actions">
+      <a class="btn" routerLink="/cvs"><app-icon name="upload" [size]="16" /> Upload CV</a>
+      <a class="btn btn-primary" routerLink="/jobs">
+        <app-icon name="sparkles" [size]="16" /> Start customization
+      </a>
+    </div>
+  </header>
+
+  @if (loading()) {
+    <div class="stats" aria-busy="true" aria-label="Loading dashboard">
+      @for (i of [1, 2, 3, 4]; track i) {
+        <div class="skeleton stat-skeleton"></div>
+      }
+    </div>
+    <div class="grid-main">
+      <div class="skeleton block-skeleton"></div>
+      <div class="skeleton block-skeleton"></div>
+    </div>
+  } @else if (error()) {
+    <div class="alert error" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ error() }}</span>
+      <button type="button" class="btn btn-sm" (click)="load()">
+        <app-icon name="refresh" [size]="14" /> Retry
+      </button>
+    </div>
+  } @else if (dashboard(); as d) {
+    @if (isNew()) {
+      <section class="welcome" aria-labelledby="welcome-title">
+        <h2 id="welcome-title">Welcome to CVPilot AI</h2>
+        <p>Three steps to a CV tailored to the job you want — without inventing anything.</p>
+        <ol class="steps">
+          <li>
+            <span class="step-icon"><app-icon name="upload" /></span>
+            <strong>Upload your CV</strong>
+            <span>PDF, DOCX or LaTeX. We extract an editable profile.</span>
+          </li>
+          <li>
+            <span class="step-icon"><app-icon name="briefcase" /></span>
+            <strong>Add a job</strong>
+            <span>Paste or upload the posting. We read every requirement.</span>
+          </li>
+          <li>
+            <span class="step-icon"><app-icon name="chat" /></span>
+            <strong>Tailor &amp; export</strong>
+            <span>Chat about the gaps, approve each section, download.</span>
+          </li>
+        </ol>
+        <a class="btn btn-primary btn-lg" routerLink="/cvs">
+          Upload your first CV <app-icon name="arrow" [size]="16" />
+        </a>
+      </section>
+    }
+
+    <section class="stats" aria-label="Key figures">
+      <a class="stat" routerLink="/cvs">
+        <span class="stat-icon"><app-icon name="file" /></span>
+        <span class="stat-value nums">{{ d.stats.cvCount }}</span>
+        <span class="stat-label">CVs uploaded</span>
+      </a>
+      <a class="stat" routerLink="/analyses">
+        <span class="stat-icon"><app-icon name="sparkles" /></span>
+        <span class="stat-value nums">{{ d.stats.analysisCount }}</span>
+        <span class="stat-label">Customizations</span>
+      </a>
+      <a class="stat" routerLink="/analyses">
+        <span class="stat-icon"><app-icon name="download" /></span>
+        <span class="stat-value nums">{{ d.stats.generatedCount }}</span>
+        <span class="stat-label">Exported CVs</span>
+      </a>
+      <div class="stat score-stat">
+        @if (d.stats.averageScore !== null) {
+          <app-score-ring [score]="d.stats.averageScore" [size]="52" />
+          <div>
+            <span class="stat-label">Average match</span>
+            <span class="muted small">Best: {{ d.stats.bestScore }}/100</span>
+          </div>
+        } @else {
+          <span class="stat-icon"><app-icon name="target" /></span>
+          <span class="stat-value">—</span>
+          <span class="stat-label">Average match</span>
+        }
+      </div>
+    </section>
+
+    <div class="grid-main">
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <h2>Recent match scores</h2>
+            <p class="muted small">Estimated fit of each customized CV, out of 100.</p>
+          </div>
+          <a class="btn btn-ghost btn-sm" routerLink="/analyses">View all</a>
+        </div>
+        @if (d.recentAnalyses.length === 0) {
+          <div class="mini-empty">
+            <p>No customizations yet.</p>
+            <a class="btn btn-sm" routerLink="/jobs">Start one</a>
+          </div>
+        } @else {
+          <ul class="bars" aria-label="Match score per customization">
+            @for (a of d.recentAnalyses; track a.id) {
+              <li>
+                <a
+                  class="bar-row"
+                  [routerLink]="['/analyses', a.id, 'review']"
+                  [title]="a.jobTitle + ' — ' + a.score + '/100 (' + band(a.score) + ')'"
+                >
+                  <span class="bar-label">
+                    <span class="bar-title">{{ a.jobTitle }}</span>
+                    <span class="muted small">{{ a.cvFileName }} · {{ a.createdAt | date: 'MMM d' }}</span>
+                  </span>
+                  <span class="bar-track" aria-hidden="true">
+                    <span class="bar-fill" [style.width.%]="a.score"></span>
+                  </span>
+                  <span class="bar-value nums">{{ a.score }}<span class="muted small"> · {{ band(a.score) }}</span></span>
+                </a>
+              </li>
+            }
+          </ul>
+        }
+      </section>
+
+      <div class="stack">
+        <section class="section">
+          <div class="section-head">
+            <h2>Recent job descriptions</h2>
+            <a class="btn btn-ghost btn-sm" routerLink="/jobs">New</a>
+          </div>
+          @if (d.recentJobs.length === 0) {
+            <p class="muted small">No job descriptions yet. Start a customization to add one.</p>
+          } @else {
+            <ul class="list">
+              @for (job of d.recentJobs; track job.id) {
+                <li class="list-row">
+                  <span class="list-icon"><app-icon name="briefcase" [size]="16" /></span>
+                  <span class="list-main">
+                    <span class="strong">{{ jobTitle(job) }}</span>
+                    <span class="muted small nums">
+                      {{ positionLabel(job) }} · {{ job.createdAt | date: 'mediumDate' }}
+                    </span>
+                  </span>
+                </li>
+              }
+            </ul>
+          }
+        </section>
+
+        <section class="section">
+          <div class="section-head">
+            <h2>Recent activity</h2>
+          </div>
+          @if (d.activity.length === 0) {
+            <p class="muted small">Your uploads, analyses and exports will appear here.</p>
+          } @else {
+            <ul class="list">
+              @for (item of d.activity; track item.id) {
+                <li class="list-row">
+                  <span class="list-icon" [class]="'list-icon ' + tone(item.type)">
+                    <app-icon [name]="activityIcon(item.type)" [size]="14" />
+                  </span>
+                  <span class="list-main">
+                    <span>{{ item.label }}</span>
+                    <span class="muted small">{{ item.at | date: 'MMM d, HH:mm' }}</span>
+                  </span>
+                </li>
+              }
+            </ul>
+          }
+        </section>
+      </div>
+    </div>
+  }
+</div>

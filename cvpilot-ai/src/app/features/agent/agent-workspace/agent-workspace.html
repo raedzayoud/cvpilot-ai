@@ -1,0 +1,275 @@
+@if (loading()) {
+  <div class="ws-page">
+    <div class="skeleton title-skeleton"></div>
+    <div class="ws-grid" aria-busy="true" aria-label="Loading workspace">
+      <div class="skeleton block-skeleton"></div>
+      <div class="skeleton block-skeleton"></div>
+      <div class="skeleton block-skeleton"></div>
+    </div>
+  </div>
+} @else if (error()) {
+  <div class="page">
+    <div class="alert error" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ error() }}</span>
+      <button type="button" class="btn btn-sm" (click)="load()">Retry</button>
+      <a class="btn btn-sm" routerLink="/agent">All sessions</a>
+    </div>
+  </div>
+} @else if (ws(); as w) {
+  <div class="ws-page">
+    <header class="ws-head">
+      <div class="ws-title">
+        <a class="back" routerLink="/agent"><app-icon name="back" [size]="14" /> AI CV Agent</a>
+        <h1>{{ w.session.title }}</h1>
+        <p class="muted small">
+          Editing a working copy of <strong>{{ w.session.cvFileName }}</strong>
+          @if (w.unsavedChanges) {
+            · <span class="unsaved">accepted changes not saved to your CV yet</span>
+          } @else if (w.session.savedAt) {
+            · saved {{ w.session.savedAt | date: 'MMM d, HH:mm' }}
+          }
+        </p>
+      </div>
+      <div class="ws-actions">
+        <button type="button" class="btn btn-sm tablet-only" (click)="showSessions.set(true)">
+          <app-icon name="list" [size]="14" /> Sessions
+        </button>
+        <label class="sr-only" for="export-format">Export format</label>
+        <div class="export">
+          <select id="export-format" class="select" [ngModel]="exportFormat()" (ngModelChange)="exportFormat.set($event)">
+            <option value="pdf">PDF</option>
+            <option value="tex">LaTeX</option>
+            <option value="docx">Word</option>
+          </select>
+          <button type="button" class="btn btn-sm" [disabled]="working()" (click)="download()">
+            @if (busyAction() === 'export') {
+              <span class="spinner sm" aria-hidden="true"></span>
+            } @else {
+              <app-icon name="download" [size]="14" />
+            }
+            Export
+          </button>
+        </div>
+        <button
+          type="button"
+          class="btn btn-primary btn-sm"
+          [disabled]="working() || !w.unsavedChanges"
+          title="Write the accepted changes into your CV"
+          (click)="saveToCv()"
+        >
+          <app-icon name="save" [size]="14" /> Save to CV
+        </button>
+      </div>
+    </header>
+
+    @if (!w.aiAvailable) {
+      <div class="alert warning" role="status">
+        <app-icon name="alert" [size]="16" />
+        <span>The AI agent is not configured on the server (GROQ_API_KEY). You can still review existing changes and export.</span>
+      </div>
+    }
+
+    <nav class="pane-tabs" aria-label="Workspace panes">
+      <button type="button" [class.active]="pane() === 'chat'" (click)="pane.set('chat')">
+        <app-icon name="chat" [size]="15" /> Chat
+      </button>
+      <button type="button" [class.active]="pane() === 'changes'" (click)="pane.set('changes'); side.set('changes')">
+        <app-icon name="list" [size]="15" /> Changes
+        @if (w.stats.pending) {
+          <span class="count">{{ w.stats.pending }}</span>
+        }
+      </button>
+      <button type="button" [class.active]="pane() === 'preview'" (click)="pane.set('preview'); side.set('preview')">
+        <app-icon name="eye" [size]="15" /> Preview
+      </button>
+    </nav>
+
+    <div class="ws-grid">
+      <!-- Sessions (desktop column, drawer on smaller screens) -->
+      @if (showSessions()) {
+        <div class="scrim" (click)="showSessions.set(false)" aria-hidden="true"></div>
+      }
+      <aside class="col sessions" [class.open]="showSessions()" aria-label="Sessions for this CV">
+        <div class="col-head">
+          <h2>Sessions</h2>
+          <button type="button" class="icon-btn tablet-only" aria-label="Close sessions" (click)="showSessions.set(false)">
+            <app-icon name="x" [size]="16" />
+          </button>
+        </div>
+        <ul class="session-list">
+          @for (s of sessions(); track s.id) {
+            <li>
+              <button type="button" class="session" [class.active]="s.id === w.session.id" (click)="openSession(s.id)">
+                <span class="s-title">{{ s.title }}</span>
+                <span class="muted small">{{ s.updatedAt | date: 'MMM d, HH:mm' }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+        @if (w.jobTarget; as job) {
+          <div class="job-card">
+            <p class="eyebrow">Target job</p>
+            <p class="strong">{{ job.title }}</p>
+            <p class="muted small">Match score {{ job.score }}/100</p>
+            @if (job.matchedSkills.length) {
+              <p class="small">In your CV: {{ job.matchedSkills.join(', ') }}</p>
+            }
+            @if (job.missingSkills.length) {
+              <p class="small missing">Not in your CV: {{ job.missingSkills.join(', ') }}</p>
+            }
+          </div>
+        }
+        <div class="session-tools">
+          <button type="button" class="btn btn-ghost btn-sm" [disabled]="working()" (click)="reset()">
+            <app-icon name="undo" [size]="14" /> Discard accepted changes
+          </button>
+          <button type="button" class="btn btn-ghost btn-danger btn-sm" (click)="deleteSession()">
+            <app-icon name="trash" [size]="14" /> Delete session
+          </button>
+        </div>
+      </aside>
+
+      <!-- Conversation -->
+      <section class="col chat" [class.hidden-sm]="pane() !== 'chat'" aria-label="Conversation with the agent">
+        <div class="messages" #log aria-live="polite">
+          @for (m of w.messages; track m.id) {
+            <div class="msg" [class.user]="m.role === 'user'">
+              <p class="msg-role">
+                @if (m.role === 'agent') {
+                  <app-icon name="bot" [size]="14" /> CVPilot Agent
+                } @else {
+                  You
+                }
+              </p>
+              <p class="msg-text">{{ m.text }}</p>
+              @if (m.meta; as meta) {
+                <div class="meta">
+                  <span class="chip-sm intent">{{ intentLabels[meta.intent] }}</span>
+                  @for (t of toolLabels(meta.toolsUsed); track t) {
+                    <span class="chip-sm">{{ t }}</span>
+                  }
+                  @if (meta.proposalIds.length) {
+                    <button type="button" class="chip-sm link" (click)="pane.set('changes'); side.set('changes')">
+                      {{ meta.proposalIds.length }} change{{ meta.proposalIds.length > 1 ? 's' : '' }} to review
+                    </button>
+                  }
+                </div>
+                @if (meta.blockedClaims.length) {
+                  <details class="blocked">
+                    <summary>
+                      <app-icon name="shield" [size]="13" /> Not added: {{ meta.blockedClaims.length }} unverified claim{{ meta.blockedClaims.length > 1 ? 's' : '' }}
+                    </summary>
+                    <ul>
+                      @for (b of meta.blockedClaims; track $index) {
+                        <li>{{ b }}</li>
+                      }
+                    </ul>
+                  </details>
+                }
+              }
+            </div>
+          }
+          @if (pendingText(); as text) {
+            <div class="msg user"><p class="msg-role">You</p><p class="msg-text">{{ text }}</p></div>
+            <div class="msg working" role="status">
+              <p class="msg-role"><app-icon name="bot" [size]="14" /> CVPilot Agent</p>
+              <p class="msg-text">
+                <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                Analyzing your CV and preparing changes… this can take up to a minute.
+              </p>
+            </div>
+          }
+        </div>
+
+        @if (w.messages.length <= 1 && !sending()) {
+          <div class="suggest" aria-label="Suggested instructions">
+            @for (s of suggestions; track s) {
+              <button type="button" class="suggestion" (click)="useSuggestion(s)">{{ s }}</button>
+            }
+          </div>
+        }
+
+        <form class="composer" (ngSubmit)="send()">
+          <label class="sr-only" for="agent-input">Instruction for the agent</label>
+          <textarea
+            id="agent-input"
+            name="draft"
+            class="textarea"
+            rows="2"
+            maxlength="12000"
+            placeholder="Tell the agent what to change, or paste a job description… (Enter to send)"
+            [disabled]="!w.aiAvailable"
+            [ngModel]="draft()"
+            (ngModelChange)="draft.set($event)"
+            (keydown)="onKey($event)"
+          ></textarea>
+          <button type="submit" class="btn btn-primary send" [disabled]="!draft().trim() || working() || !w.aiAvailable" aria-label="Send">
+            @if (sending()) {
+              <span class="spinner sm" aria-hidden="true"></span>
+            } @else {
+              <app-icon name="send" [size]="16" />
+            }
+          </button>
+        </form>
+      </section>
+
+      <!-- Changes & preview -->
+      <section class="col side" [class.hidden-sm]="pane() === 'chat'" aria-label="Proposed changes and preview">
+        <div class="side-tabs" role="tablist">
+          <button type="button" role="tab" [attr.aria-selected]="side() === 'changes'" [class.active]="side() === 'changes'" (click)="side.set('changes'); pane.set('changes')">
+            Changes
+            @if (w.stats.pending) {
+              <span class="count">{{ w.stats.pending }}</span>
+            }
+          </button>
+          <button type="button" role="tab" [attr.aria-selected]="side() === 'preview'" [class.active]="side() === 'preview'" (click)="side.set('preview'); pane.set('preview')">
+            Preview
+          </button>
+        </div>
+
+        @if (side() === 'changes') {
+          <div class="changes-bar">
+            <div class="tabs small-tabs" role="group" aria-label="Filter changes">
+              <button type="button" [class.active]="filter() === 'pending'" (click)="filter.set('pending')">Pending ({{ w.stats.pending }})</button>
+              <button type="button" [class.active]="filter() === 'all'" (click)="filter.set('all')">All ({{ w.proposals.length }})</button>
+            </div>
+            <button type="button" class="btn btn-sm" [disabled]="!w.stats.pending || working()" (click)="acceptAll()">
+              <app-icon name="check" [size]="14" /> Accept all
+            </button>
+          </div>
+          <div class="scroll">
+            @for (p of visibleProposals(); track p.id) {
+              <app-proposal-card
+                [proposal]="p"
+                [busy]="busyId() === p.id"
+                [locked]="working() || (busyId() !== null && busyId() !== p.id)"
+                (accept)="acceptProposal(p, $event)"
+                (reject)="rejectProposal(p)"
+                (regenerate)="regenerateProposal(p)"
+              />
+            } @empty {
+              <div class="empty compact">
+                <span class="empty-icon"><app-icon name="sparkles" [size]="20" /></span>
+                @if (filter() === 'pending') {
+                  <h2>No changes waiting</h2>
+                  <p>Ask the agent for an edit; every proposal appears here with the original, the update and the reason.</p>
+                } @else {
+                  <h2>No changes yet</h2>
+                  <p>Proposals you accept or reject stay listed here.</p>
+                }
+              </div>
+            }
+          </div>
+        } @else {
+          <div class="scroll preview">
+            <p class="muted small preview-note">
+              Live working copy: {{ w.stats.accepted }} accepted change{{ w.stats.accepted === 1 ? '' : 's' }}.
+            </p>
+            <app-cv-preview [profile]="w.working" [order]="w.sectionOrder" />
+          </div>
+        }
+      </section>
+    </div>
+  </div>
+}

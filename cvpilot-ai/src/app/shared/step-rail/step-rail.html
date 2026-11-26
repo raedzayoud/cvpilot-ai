@@ -1,0 +1,22 @@
+<ol class="steps" aria-label="Progress">
+  @for (step of steps(); track step.label; let last = $last) {
+    <li [class]="step.state" [attr.aria-current]="step.state === 'current' ? 'step' : null">
+      @if (step.state === 'done') {
+        <span class="sr-only">Completed: </span>
+      }
+      <span class="marker" aria-hidden="true">
+        @if (step.state === 'done') {
+          <svg width="12" height="12" viewBox="0 0 12 12">
+            <path d="M2.5 6.2 5 8.6 9.5 3.6" fill="none" stroke="currentColor" stroke-width="1.6" />
+          </svg>
+        } @else {
+          {{ $index + 1 }}
+        }
+      </span>
+      <span class="label">{{ step.label }}</span>
+      @if (!last) {
+        <span class="line" aria-hidden="true"></span>
+      }
+    </li>
+  }
+</ol>

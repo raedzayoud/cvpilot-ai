@@ -1,0 +1,131 @@
+@let c = change();
+<article class="card" [class]="'card ' + proposal().status" [attr.aria-label]="c.label">
+  <header class="card-head">
+    <div class="titles">
+      <span class="kind">{{ kind() }}</span>
+      <h3>{{ c.label }}</h3>
+    </div>
+    <span class="status" [class]="'status ' + proposal().status">{{ statusLabel() }}</span>
+  </header>
+
+  @if (c.reason) {
+    <p class="reason"><app-icon name="info" [size]="14" /> {{ c.reason }}</p>
+  }
+
+  @if (c.jobRequirements.length || c.keywordsAdded.length || c.keywordsRemoved.length) {
+    <div class="tags">
+      @for (r of c.jobRequirements; track r) {
+        <span class="tag job" title="Requirement of the target job">{{ r }}</span>
+      }
+      @for (k of c.keywordsAdded; track k) {
+        <span class="tag add" title="Keyword added">+ {{ k }}</span>
+      }
+      @for (k of c.keywordsRemoved; track k) {
+        <span class="tag del" title="Keyword removed">− {{ k }}</span>
+      }
+    </div>
+  }
+
+  @if (editing()) {
+    <div class="edit">
+      <label class="field-label" [attr.for]="'edit-' + proposal().id">Edit before accepting</label>
+      <textarea
+        [id]="'edit-' + proposal().id"
+        class="textarea"
+        rows="6"
+        [ngModel]="draft()"
+        (ngModelChange)="draft.set($event)"
+      ></textarea>
+      <span class="field-hint">{{ editHint() }} Your own wording counts as confirmed by you.</span>
+      <div class="row">
+        <button type="button" class="btn btn-primary btn-sm" [disabled]="!draft().trim() || busy()" (click)="saveEdit()">
+          <app-icon name="check" [size]="14" /> Accept my version
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="editing.set(false)">Cancel</button>
+      </div>
+    </div>
+  } @else {
+    @if (!removal() && c.operation !== 'reorder_sections' && c.originalText) {
+      <div class="view-toggle" role="group" aria-label="Comparison view">
+        <button type="button" [class.active]="view() === 'diff'" (click)="view.set('diff')">Changes</button>
+        <button type="button" [class.active]="view() === 'side'" (click)="view.set('side')">Side by side</button>
+      </div>
+    }
+
+    @if (removal()) {
+      <div class="pane removed-pane">
+        <p class="pane-label">Will be removed</p>
+        <p class="text">{{ c.originalText }}</p>
+      </div>
+    } @else if (view() === 'diff' || !c.originalText) {
+      <p class="text diff" aria-label="Changes: added text highlighted, removed text struck through">
+        @for (part of diff(); track $index) {
+          @if (part.kind === 'added') {
+            <ins>{{ part.text }}</ins>
+          } @else if (part.kind === 'removed') {
+            <del>{{ part.text }}</del>
+          } @else {
+            <span>{{ part.text }}</span>
+          }
+        }
+      </p>
+    } @else {
+      <div class="side">
+        <div class="pane">
+          <p class="pane-label">Original</p>
+          <p class="text">{{ c.originalText }}</p>
+        </div>
+        <div class="pane updated">
+          <p class="pane-label">Updated</p>
+          <p class="text">{{ c.updatedText }}</p>
+        </div>
+      </div>
+    }
+  }
+
+  @if (c.evidence.length) {
+    <details class="evidence">
+      <summary>Why this is accurate ({{ c.evidence.length }})</summary>
+      <ul>
+        @for (e of c.evidence; track e.term) {
+          <li>
+            <strong>{{ e.term }}</strong>
+            <span class="src" [class.user]="e.source === 'user_confirmed'">
+              {{ e.source === 'cv' ? 'in your CV' : 'confirmed by you' }}
+            </span>
+          </li>
+        }
+      </ul>
+    </details>
+  }
+
+  @if (pending() && !editing()) {
+    <footer class="actions">
+      <button type="button" class="btn btn-primary btn-sm" [disabled]="busy() || locked()" (click)="accept.emit(undefined)">
+        @if (busy()) {
+          <span class="spinner sm" aria-hidden="true"></span>
+        } @else {
+          <app-icon name="check" [size]="14" />
+        }
+        Accept
+      </button>
+      <button type="button" class="btn btn-sm" [disabled]="busy() || locked()" (click)="reject.emit()">
+        <app-icon name="x" [size]="14" /> Reject
+      </button>
+      @if (editable()) {
+        <button type="button" class="btn btn-ghost btn-sm" [disabled]="busy() || locked()" (click)="startEdit()">
+          <app-icon name="edit" [size]="14" /> Edit
+        </button>
+      }
+      <button
+        type="button"
+        class="btn btn-ghost btn-sm"
+        [disabled]="busy() || locked()"
+        title="Ask the agent for a different version"
+        (click)="regenerate.emit()"
+      >
+        <app-icon name="refresh" [size]="14" /> Regenerate
+      </button>
+    </footer>
+  }
+</article>

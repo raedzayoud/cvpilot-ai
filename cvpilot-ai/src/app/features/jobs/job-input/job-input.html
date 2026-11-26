@@ -1,0 +1,155 @@
+<div class="page">
+  <app-step-rail [steps]="steps" />
+
+  <header class="page-head">
+    <div>
+      <p class="eyebrow"><app-icon name="briefcase" [size]="14" /> Step 2</p>
+      <h1>Target job</h1>
+      <p class="sub">
+        Paste a job description or upload one. CVPilot reads every requirement, scores your CV and
+        chats with you about the gaps — one posting can list several roles.
+      </p>
+    </div>
+  </header>
+
+  @if (loading()) {
+    <div class="stack" aria-busy="true" aria-label="Loading your CVs">
+      <div class="skeleton row-skeleton"></div>
+      <div class="skeleton block-skeleton"></div>
+    </div>
+  } @else if (cvs().length === 0 && !error()) {
+    <div class="empty">
+      <span class="empty-icon"><app-icon name="file" [size]="22" /></span>
+      <h2>Upload a CV first</h2>
+      <p>A job can only be compared against a CV you already added.</p>
+      <a class="btn btn-primary" routerLink="/cvs">Go to your CVs</a>
+    </div>
+  } @else if (cvs().length === 0 && error()) {
+    <div class="alert error" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ error() }}</span>
+      <button type="button" class="btn btn-sm" (click)="load()">Retry</button>
+    </div>
+  } @else {
+    <form class="stack" (ngSubmit)="submit()" novalidate>
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <h2>CV to adapt</h2>
+            <p class="muted small">Your original content and language are used throughout.</p>
+          </div>
+        </div>
+        <label class="sr-only" for="cv-select">CV to adapt</label>
+        <select
+          id="cv-select"
+          name="cv"
+          class="select"
+          [disabled]="submitting()"
+          [ngModel]="cvId()"
+          (ngModelChange)="cvId.set($event)"
+        >
+          @for (cv of cvs(); track cv.id) {
+            <option [value]="cv.id">{{ cv.fileName }} — {{ cv.language }}</option>
+          }
+        </select>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <h2>Job description</h2>
+        </div>
+
+        <div class="tabs" role="group" aria-label="Job description input">
+          <button
+            type="button"
+            [class.active]="mode() === 'paste'"
+            [attr.aria-pressed]="mode() === 'paste'"
+            (click)="mode.set('paste')"
+          >
+            Paste text
+          </button>
+          <button
+            type="button"
+            [class.active]="mode() === 'upload'"
+            [attr.aria-pressed]="mode() === 'upload'"
+            (click)="mode.set('upload')"
+          >
+            Upload file
+          </button>
+        </div>
+
+        <div class="input-area">
+          @if (mode() === 'paste') {
+            <div class="field">
+              <textarea
+                class="textarea"
+                name="text"
+                rows="12"
+                placeholder="Paste the full job description or recruitment announcement here…"
+                aria-label="Job description text"
+                [class.invalid]="!!textError()"
+                [attr.aria-invalid]="!!textError()"
+                aria-describedby="job-text-help"
+                [disabled]="submitting()"
+                [ngModel]="text()"
+                (ngModelChange)="text.set($event)"
+                (blur)="touched.set(true)"
+              ></textarea>
+              <div id="job-text-help" class="row between">
+                @if (textError(); as message) {
+                  <span class="field-error">{{ message }}</span>
+                } @else {
+                  <span class="hint">A single job or an announcement listing several positions.</span>
+                }
+                <span class="hint nums">{{ textLength().toLocaleString() }} / {{ maxChars.toLocaleString() }}</span>
+              </div>
+            </div>
+          } @else if (jobFile(); as file) {
+            <div class="file-selected">
+              <span class="file-icon"><app-icon name="file" /></span>
+              <div class="grow">
+                <p class="strong">{{ file.name }}</p>
+                <p class="muted small">The text is extracted on the server and the whole posting is used.</p>
+              </div>
+              <button type="button" class="btn btn-sm" [disabled]="submitting()" (click)="jobFile.set(null)">
+                Change file
+              </button>
+            </div>
+          } @else {
+            <app-dropzone
+              accept=".pdf,.docx"
+              title="Drop the job description"
+              hint="PDF or DOCX, up to 10 MB"
+              (fileSelected)="chooseFile($event)"
+            />
+          }
+        </div>
+      </section>
+
+      @if (error()) {
+        <div class="alert error" role="alert">
+          <app-icon name="alert" [size]="16" />
+          <span>{{ error() }}</span>
+        </div>
+      }
+
+      @if (submitting()) {
+        <div class="alert info" role="status">
+          <span class="spinner sm" aria-hidden="true"></span>
+          <span>Reading the posting, scoring your CV and preparing the plan… this can take a few seconds.</span>
+        </div>
+      }
+
+      <div class="row between">
+        <a class="btn" routerLink="/cvs"><app-icon name="back" [size]="16" /> Back</a>
+        <button type="submit" class="btn btn-primary btn-lg" [disabled]="!canSubmit()">
+          @if (submitting()) {
+            <span class="spinner sm" aria-hidden="true"></span> Analyzing…
+          } @else {
+            Start customization <app-icon name="arrow" [size]="16" />
+          }
+        </button>
+      </div>
+    </form>
+  }
+</div>

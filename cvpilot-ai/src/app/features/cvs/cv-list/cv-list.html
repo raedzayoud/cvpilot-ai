@@ -1,0 +1,205 @@
+<div class="page">
+  <header class="page-head">
+    <div>
+      <p class="eyebrow"><app-icon name="file" [size]="14" /> Library</p>
+      <h1>My CVs</h1>
+      <p class="sub">
+        Upload the CV you already use. The original file is kept untouched; you edit an extracted
+        copy and every generated claim stays traced to it.
+      </p>
+    </div>
+    <div class="head-actions">
+      <button
+        type="button"
+        class="btn btn-primary"
+        [attr.aria-expanded]="showUpload()"
+        (click)="showUpload.set(!showUpload())"
+      >
+        <app-icon [name]="showUpload() ? 'x' : 'upload'" [size]="16" />
+        {{ showUpload() ? 'Close' : 'Upload CV' }}
+      </button>
+    </div>
+  </header>
+
+  @if (showUpload() || (!loading() && !error() && cvs().length === 0 && !search())) {
+    @if (uploading()) {
+      <div class="section upload-state" role="status">
+        <span class="spinner" aria-hidden="true"></span>
+        <div>
+          <p class="strong">Reading your CV and extracting the profile…</p>
+          <p class="muted small">
+            This usually takes a few seconds. You can review and correct every field afterwards.
+          </p>
+        </div>
+      </div>
+    } @else {
+      <div class="section upload-panel">
+        <div class="tabs" role="tablist" aria-label="CV source">
+          <button
+            type="button"
+            role="tab"
+            [attr.aria-selected]="mode() === 'file'"
+            [class.active]="mode() === 'file'"
+            (click)="mode.set('file')"
+          >
+            Upload file
+          </button>
+          <button
+            type="button"
+            role="tab"
+            [attr.aria-selected]="mode() === 'latex'"
+            [class.active]="mode() === 'latex'"
+            (click)="mode.set('latex')"
+          >
+            Paste LaTeX
+          </button>
+        </div>
+
+        @if (mode() === 'file') {
+          <app-dropzone
+            title="Drop your CV here or click to browse"
+            hint="PDF, DOCX or LaTeX (.tex), up to 10 MB."
+            (fileSelected)="upload($event)"
+          />
+        } @else {
+          <div class="latex-form">
+            <div class="field">
+              <label for="latex-name">File name</label>
+              <input
+                id="latex-name"
+                class="input"
+                maxlength="200"
+                [ngModel]="latexName()"
+                (ngModelChange)="latexName.set($event)"
+                placeholder="My_CV.tex"
+              />
+            </div>
+            <div class="field">
+              <label for="latex-source">LaTeX source</label>
+              <textarea
+                id="latex-source"
+                class="textarea code"
+                rows="10"
+                [ngModel]="latexSource()"
+                (ngModelChange)="latexSource.set($event)"
+                placeholder="\documentclass{article}&#10;\begin{document}&#10;..."
+              ></textarea>
+              <span class="hint">Your preamble is kept on export; only the body is rewritten.</span>
+            </div>
+            <div>
+              <button
+                type="button"
+                class="btn btn-primary"
+                [disabled]="!latexSource().trim()"
+                (click)="uploadTex()"
+              >
+                Add LaTeX CV
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+      <div class="divider"></div>
+    }
+  }
+
+  <div class="toolbar">
+    <label class="search">
+      <span class="sr-only">Search CVs</span>
+      <app-icon name="search" [size]="16" />
+      <input
+        class="input"
+        type="search"
+        placeholder="Search by file name or language"
+        [ngModel]="search()"
+        (ngModelChange)="onSearch($event)"
+      />
+    </label>
+    @if (!loading() && !error()) {
+      <span class="muted small nums">{{ total() }} {{ total() === 1 ? 'CV' : 'CVs' }}</span>
+    }
+  </div>
+
+  @if (loading()) {
+    <div class="stack-sm" aria-busy="true" aria-label="Loading your CVs">
+      <div class="skeleton row-skeleton"></div>
+      <div class="skeleton row-skeleton"></div>
+      <div class="skeleton row-skeleton"></div>
+    </div>
+  } @else if (error()) {
+    <div class="alert error" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ error() }}</span>
+      <button type="button" class="btn btn-sm" (click)="load()">Retry</button>
+    </div>
+  } @else if (cvs().length === 0) {
+    <div class="empty">
+      <span class="empty-icon"><app-icon name="file" [size]="22" /></span>
+      @if (search()) {
+        <h2>No CV matches “{{ search() }}”</h2>
+        <p>Try another file name or clear the search.</p>
+      } @else {
+        <h2>No CV yet</h2>
+        <p>Add the CV you already use to start adapting it to a job.</p>
+      }
+    </div>
+  } @else {
+    <div class="list">
+      @for (cv of cvs(); track cv.id) {
+        <div class="link-row">
+          <div class="file">
+            <span class="ext" [class]="'ext ' + cv.sourceFormat" aria-hidden="true">{{
+              extension(cv.fileName)
+            }}</span>
+            <div class="file-meta">
+              <a class="name" [routerLink]="['/cvs', cv.id]">{{ cv.fileName }}</a>
+              <p class="muted small nums">
+                {{ formatSize(cv.sizeBytes) }} · updated {{ cv.updatedAt | date: 'mediumDate' }}
+              </p>
+            </div>
+          </div>
+          <div class="row actions">
+            <span class="badge">{{ cv.language }}</span>
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              (click)="downloadOriginal(cv)"
+              [attr.aria-label]="'Download original ' + cv.fileName"
+            >
+              <app-icon name="download" [size]="14" /> Original
+            </button>
+            <a class="btn btn-sm" [routerLink]="['/cvs', cv.id]">
+              <app-icon name="edit" [size]="14" /> Open
+            </a>
+            <a class="btn btn-sm" routerLink="/agent" [queryParams]="{ cv: cv.id }" [attr.aria-label]="'Edit ' + cv.fileName + ' with the AI Agent'">
+              <app-icon name="bot" [size]="14" /> AI Agent
+            </a>
+            <button
+              type="button"
+              class="btn btn-ghost btn-danger btn-sm"
+              [disabled]="deletingId() === cv.id"
+              [attr.aria-label]="'Delete ' + cv.fileName"
+              (click)="deleteCv(cv)"
+            >
+              @if (deletingId() === cv.id) {
+                <span class="spinner sm" aria-hidden="true"></span>
+              } @else {
+                <app-icon name="trash" [size]="14" />
+              }
+              Delete
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+
+    @if (cvs().length < total()) {
+      <div class="pager">
+        <span class="muted small nums">Showing {{ cvs().length }} of {{ total() }}</span>
+        <button type="button" class="btn" [disabled]="loadingMore()" (click)="loadMore()">
+          {{ loadingMore() ? 'Loading…' : 'Load more' }}
+        </button>
+      </div>
+    }
+  }
+</div>

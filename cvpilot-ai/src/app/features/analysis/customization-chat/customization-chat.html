@@ -1,0 +1,379 @@
+<div class="page">
+  <app-step-rail [steps]="steps()" />
+
+  @if (loading()) {
+    <div class="chat-grid" aria-busy="true" aria-label="Loading conversation">
+      <div class="skeleton block-skeleton tall"></div>
+      <div class="skeleton block-skeleton tall"></div>
+    </div>
+  } @else if (error()) {
+    <div class="alert error" role="alert">
+      <span>{{ error() }}</span>
+      <button type="button" class="btn btn-sm" (click)="load()">Retry</button>
+      <a class="btn btn-sm" routerLink="/analyses">History</a>
+    </div>
+  } @else if (customization(); as c) {
+    <header class="page-head">
+      <div>
+        <h1>Customize with CVPilot</h1>
+        <p class="sub">
+          Written in {{ c.language }}, same as your CV. Tell CVPilot what you actually did — it only
+          approves text your original CV can back.
+        </p>
+      </div>
+      <div class="head-actions">
+        <a class="btn" routerLink="/analyses"><app-icon name="history" [size]="16" /> History</a>
+        <a class="btn" routerLink="/jobs"><app-icon name="briefcase" [size]="16" /> Another job</a>
+      </div>
+    </header>
+
+    <div class="chat-grid">
+      <section class="section chat">
+        <div class="messages" #log aria-live="polite" aria-label="Conversation">
+          @for (message of messages(); track message.id) {
+            <div class="msg" [class.user]="message.role === 'user'">
+              <p class="msg-role">{{ message.role === 'user' ? 'You' : 'CVPilot' }}</p>
+              <p class="msg-text">{{ message.text }}</p>
+            </div>
+          }
+          @if (sending()) {
+            <div class="msg typing" aria-label="CVPilot is typing">
+              <p class="msg-role">CVPilot</p>
+              <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            </div>
+          }
+        </div>
+
+        <div class="quick" aria-label="Suggested questions">
+          @for (q of suggestions; track q) {
+            <button type="button" class="chip quick-chip" [disabled]="sending()" (click)="ask(q)">{{ q }}</button>
+          }
+        </div>
+
+        <form class="composer" (ngSubmit)="send()">
+          <label class="sr-only" for="chat-input">Message CVPilot</label>
+          <textarea
+            id="chat-input"
+            class="textarea"
+            rows="2"
+            placeholder="Answer, or ask CVPilot about this job… (Enter to send, Shift+Enter for a new line)"
+            [attr.maxlength]="maxMessage"
+            [ngModel]="draft()"
+            (ngModelChange)="draft.set($event)"
+            (keydown)="onComposerKey($event)"
+            name="draft"
+          ></textarea>
+          <button
+            type="submit"
+            class="btn btn-primary send"
+            [disabled]="!draft().trim() || sending()"
+            aria-label="Send message"
+          >
+            @if (sending()) {
+              <span class="spinner sm" aria-hidden="true"></span>
+            } @else {
+              <app-icon name="send" [size]="16" />
+            }
+          </button>
+        </form>
+      </section>
+
+      <section class="section living">
+        <div class="section-head">
+          <div>
+            <h2>Living CV</h2>
+            <p class="muted small">{{ readyCount() }} of {{ c.sections.length }} sections ready</p>
+            <div class="progress" aria-hidden="true">
+              <span [style.width.%]="(readyCount() / c.sections.length) * 100"></span>
+            </div>
+          </div>
+        </div>
+
+        @if (insights(); as fit) {
+          <div class="fit-card" aria-label="Job fit overview">
+            <div class="fit-top">
+              <app-score-ring [score]="fit.score" [size]="64" />
+              <div class="fit-summary">
+                <h3>Job fit</h3>
+                <p class="muted small">{{ fit.disclaimer }}</p>
+              </div>
+            </div>
+
+            @if (fit.strengths.length > 0) {
+              <div class="fit-strengths">
+                @for (strength of fit.strengths; track strength) {
+                  <span class="chip good">{{ strength }}</span>
+                }
+              </div>
+            }
+
+            <details class="fit-details">
+              <summary>See breakdown, gaps and skills to develop</summary>
+
+              <div class="fit-criteria">
+                @for (criterion of fit.criteria; track criterion.key) {
+                  <div class="criterion">
+                    <div class="row between">
+                      <strong>{{ criterion.label }}</strong>
+                      <span class="muted small"
+                        >{{ criterion.points }}/{{ criterion.weight }}</span
+                      >
+                    </div>
+                    <div class="bar">
+                      <span [style.width.%]="criterion.ratio * 100"></span>
+                    </div>
+                    @if (criterion.evidence.length > 0) {
+                      <div class="evidence">
+                        @for (item of criterion.evidence; track item.requirement) {
+                          <span
+                            class="chip"
+                            [class.good]="item.level === 'matched'"
+                            [class.partial]="item.level === 'partial'"
+                            [class.warn]="item.level === 'missing'"
+                            [class.soft]="item.level === 'unverified'"
+                            >{{ item.requirement }}</span
+                          >
+                        }
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+
+              @if (fit.weaknesses.length > 0) {
+                <div class="fit-block">
+                  <h4>Weak spots</h4>
+                  @for (weakness of fit.weaknesses; track weakness.id) {
+                    <article class="weakness">
+                      <div class="row between">
+                        <strong>{{ weakness.title }}</strong>
+                        <span
+                          class="badge"
+                          [class.warn]="weakness.severity === 'high'"
+                          [class.blue]="weakness.severity === 'low'"
+                          >{{ weakness.severity }}</span
+                        >
+                      </div>
+                      <p class="muted small">{{ weakness.description }}</p>
+                      <p class="muted small">
+                        <em>Why it matters:</em> {{ weakness.whyItMatters }}
+                      </p>
+                      <p class="hint">{{ weakness.improvement }}</p>
+                    </article>
+                  }
+                </div>
+              }
+
+              @if (fit.improvements.length > 0) {
+                <div class="fit-block">
+                  <h4>Recommended next steps</h4>
+                  <ul class="fit-list">
+                    @for (item of fit.improvements; track item) {
+                      <li>{{ item }}</li>
+                    }
+                  </ul>
+                </div>
+              }
+
+              @if (fit.skillRecommendations.length > 0) {
+                <div class="fit-block">
+                  <h4>Skills to develop</h4>
+                  <p class="muted small">
+                    Add these to your CV only after you have genuinely used them.
+                  </p>
+                  @for (rec of fit.skillRecommendations; track rec.id) {
+                    <article class="skill-rec">
+                      <div class="row between">
+                        <strong>{{ rec.skill }}</strong>
+                        <span class="badge">{{ rec.priority }}</span>
+                      </div>
+                      <p class="muted small">{{ rec.why }}</p>
+                      <p class="muted small">{{ rec.relation }}</p>
+                      <p class="hint">{{ rec.activity }}</p>
+                    </article>
+                  }
+                </div>
+              }
+            </details>
+          </div>
+        }
+
+        <div class="review">
+          <h2>Review changes</h2>
+          <p class="muted small">
+            Nothing is removed unless you choose Remove. Dates, companies and education stay
+            intact.
+          </p>
+
+          @for (group of groups(); track group.suggestion) {
+            @if (group.items.length > 0) {
+              <div class="decision-group">
+                <h3>{{ group.label }} <span class="badge">{{ group.items.length }}</span></h3>
+                @for (decision of group.items; track decision.id) {
+                  <article class="decision">
+                    <div class="row">
+                      <strong>{{ decision.label }}</strong>
+                      <span class="badge">{{ kindLabel(decision.kind) }}</span>
+                      @if (decision.action === 'remove') {
+                        <span class="badge warn">Will remove</span>
+                      }
+                    </div>
+                    <p class="muted small">{{ decision.reason }}</p>
+                    <div
+                      class="segmented"
+                      role="group"
+                      [attr.aria-label]="'Action for ' + decision.label"
+                    >
+                      @for (action of actions; track action.value) {
+                        <button
+                          type="button"
+                          class="btn"
+                          [class.active]="decision.action === action.value"
+                          [disabled]="savingDecision() === decision.id"
+                          (click)="decide(decision, action.value)"
+                        >
+                          {{ action.label }}
+                        </button>
+                      }
+                    </div>
+                    @if (
+                      decision.suggestion === 'suggest_remove' && decision.action === 'deprioritize'
+                    ) {
+                      <p class="hint">Suggested to remove. It stays, lowered, until you choose Remove.</p>
+                    }
+                  </article>
+                }
+              </div>
+            }
+          }
+        </div>
+
+        @for (section of c.sections; track section.key) {
+          <article class="living-section">
+            <div class="row between section-head">
+              <div class="row">
+                <h3>{{ section.label }}</h3>
+                <span
+                  class="badge"
+                  [class.blue]="section.approved"
+                  [class.warn]="section.violations.length > 0"
+                >
+                  {{ statusLabel(section) }}
+                </span>
+              </div>
+              @if (!section.locked) {
+                <button
+                  type="button"
+                  class="btn"
+                  [disabled]="savingKey() === section.key || section.approved"
+                  (click)="approve(section)"
+                >
+                  {{
+                    savingKey() === section.key
+                      ? 'Checking…'
+                      : section.approved
+                        ? 'Approved'
+                        : 'Check and approve'
+                  }}
+                </button>
+              }
+            </div>
+
+            <div class="compare">
+              <div class="pane">
+                <p class="pane-label">Original</p>
+                <p class="text">{{ section.original }}</p>
+              </div>
+              <div class="pane proposed">
+                <p class="pane-label">Proposed</p>
+                @if (section.locked) {
+                  <p class="text">{{ section.proposed }}</p>
+                } @else {
+                  <textarea
+                    class="textarea proposed-text"
+                    rows="4"
+                    appAutoGrow
+                    [attr.aria-label]="'Proposed text for ' + section.label"
+                    [ngModel]="section.proposed"
+                    (ngModelChange)="editSection(section.key, $event)"
+                  ></textarea>
+                }
+              </div>
+            </div>
+
+            @if (section.violations.length > 0) {
+              <div class="alert error violations" role="alert">
+                <ul>
+                  @for (violation of section.violations; track violation) {
+                    <li>{{ violation }}</li>
+                  }
+                </ul>
+              </div>
+            }
+
+            @if (section.sources.length > 0) {
+              <details class="sources">
+                <summary>Evidence from your CV ({{ section.sources.length }})</summary>
+                <ul>
+                  @for (source of section.sources; track source.line) {
+                    <li>
+                      <span class="line-no">Line {{ source.line }}</span>
+                      <span>{{ source.text }}</span>
+                    </li>
+                  }
+                </ul>
+              </details>
+            }
+          </article>
+        }
+
+        <div class="export">
+          <p class="muted small export-note">
+            Every format uses the same LaTeX résumé template: centered header, ruled sections, roles
+            with dates on the right, bullet points and Technologies lines.
+          </p>
+          <div class="options three">
+            @for (option of exportOptions; track option.value) {
+              <label class="option" [class.selected]="format() === option.value">
+                <input
+                  type="radio"
+                  name="format"
+                  [value]="option.value"
+                  [checked]="format() === option.value"
+                  (change)="format.set(option.value)"
+                />
+                <span class="body">
+                  <span class="title">{{ option.title }}</span>
+                  <span class="muted small">{{ option.hint }}</span>
+                </span>
+              </label>
+            }
+          </div>
+
+          <div class="row between save-bar">
+            <span class="muted small">
+              @if (!canExport()) {
+                Approve each section to download.
+              } @else {
+                Everything is approved.
+              }
+            </span>
+            <button
+              type="button"
+              class="btn btn-primary"
+              [disabled]="!canExport() || exporting()"
+              (click)="download()"
+            >
+              @if (exporting()) {
+                <span class="spinner sm" aria-hidden="true"></span> Preparing…
+              } @else {
+                <app-icon name="download" [size]="16" />
+                {{ 'Download ' + format().toUpperCase() }}
+              }
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  }
+</div>
